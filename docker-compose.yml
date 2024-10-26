@@ -1,0 +1,27 @@
+version: "3.8"
+
+services:
+  db:
+    image: postgres:latest
+    container_name: payment_tracker_db
+    environment:
+      POSTGRES_USER: yourusername
+      POSTGRES_PASSWORD: yourpassword
+      POSTGRES_DB: payment_tracker
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+
+  dbmate:
+    image: amacneil/dbmate:latest
+    environment:
+      DATABASE_URL: postgres://yourusername:yourpassword@db:5432/payment_tracker?sslmode=disable
+    depends_on:
+      - db
+    volumes:
+      - ./migrations:/db/migrations
+    entrypoint: ["dbmate", "up"]
+
+volumes:
+  db_data:

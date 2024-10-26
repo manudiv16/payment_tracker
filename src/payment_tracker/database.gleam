@@ -1,46 +1,45 @@
+import envoy
+import gleam/int
+import gleam/option
+import gleam/pgo
 import gleam/result
-import payment_tracker/error.{type AppError}
-import sqlight
 
 pub type Connection =
-  sqlight.Connection
+  pgo.Connection
 
-pub fn with_connection(name: String, f: fn(sqlight.Connection) -> a) -> a {
-  use db <- sqlight.with_connection(name)
-  let assert Ok(_) = sqlight.exec("PRAGMA foreign_keys = ON;", db)
-  f(db)
+const default_host = "localhost"
+
+const default_user = "postgres"
+
+const default_database = "database"
+
+const default_password = ""
+
+const default_port = 5432
+
+fn connection_options_from_variables() -> pgo.Config {
+  let host = envoy.get("PGHOST") |> result.unwrap(default_host)
+  let user = envoy.get("PGUSER") |> result.unwrap(default_user)
+  let password = envoy.get("PGPASSWORD") |> result.unwrap(default_password)
+  let database =
+    envoy.get("PGDATABASE")
+    |> result.unwrap(default_database)
+  let port =
+    envoy.get("PGPORT")
+    |> result.then(int.parse)
+    |> result.unwrap(default_port)
+
+  pgo.Config(
+    ..pgo.default_config(),
+    host: host,
+    user: user,
+    password: option.Some(password),
+    database: database,
+    port: port,
+  )
 }
 
-/// Run some idempotent DDL to ensure we have the PostgreSQL database schema
-/// that we want. This should be run when the application starts.
-pub fn migrate_schema(db: sqlight.Connection) -> Result(Nil, AppError) {
-  sqlight.exec(
-    "
-create table if not exists users (
-  id text primary key not null,
-  name text not null,
-  email text not null unique
-) strict;
-create table if not exists categories (
-  id text primary key not null,
-  user_id text not null,
-  name text not null,
-  foreign key (user_id) references users(id)
-) strict;
-create table if not exists payments (
-  id text primary key not null,
-  user_id text not null,
-  ammount integer not null,
-  description text not null,
-  category text not null,
-  payment_type text not null,
-  timestamp integer not null,
-  foreign key (user_id) references users(id),
-  foreign key (category) references categories(id)
-) strict;
-
-    ",
-    db,
-  )
-  |> result.map_error(error.SqlightError)
+pub fn with_pgo_connection(f: fn(pgo.Connection) -> a) -> a {
+  let db = pgo.connect(connection_options_from_variables())
+  f(db)
 }

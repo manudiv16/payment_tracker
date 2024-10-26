@@ -1,8 +1,10 @@
 import gleam/dynamic.{type Dynamic}
 import gleam/json
 import gleam/result
+import payment_tracker/database
 import payment_tracker/error.{type AppError}
-import sqlight
+import payment_tracker/utils
+import squirrels/sql
 
 pub type Category {
   Category(id: String, user_id: String, name: String)
@@ -20,7 +22,7 @@ pub fn category_row_decoder() -> dynamic.Decoder(Category) {
 pub fn category_to_json(category: Category) -> json.Json {
   json.object([
     #("category_id", json.string(category.id)),
-    #("category_user_id", json.string(category.user_id)),
+    #("user_id", json.string(category.user_id)),
     #("category_name", json.string(category.name)),
   ])
 }
@@ -30,7 +32,7 @@ pub fn category_json_decoder(json: Dynamic) -> Result(Category, AppError) {
     dynamic.decode3(
       Category,
       dynamic.field("category_id", dynamic.string),
-      dynamic.field("category_user_id", dynamic.string),
+      dynamic.field("user_id", dynamic.string),
       dynamic.field("category_name", dynamic.string),
     )
 
@@ -40,85 +42,48 @@ pub fn category_json_decoder(json: Dynamic) -> Result(Category, AppError) {
 }
 
 pub fn add_category_if_not_exists(
+  db: database.Connection,
   category: Category,
-  db: sqlight.Connection,
 ) -> Result(Nil, AppError) {
-  let sql =
-    "
-  insert into categories
-  (id, user_id, name)
-  select ?1, ?2, ?3
-  where not exists (
-    select 1
-    from categories
-    where id = ?1
-    );
-  and exists (
-    select 1
-    from users
-    where id = ?2
-  );
-"
-
-  sqlight.query(
-    sql,
-    on: db,
-    with: [
-      sqlight.text(category.id),
-      sqlight.text(category.user_id),
-      sqlight.text(category.name),
-    ],
-    expecting: category_row_decoder(),
-  )
-  |> result.map(fn(_) { Nil })
-  |> result.map_error(fn(_) { error.CategoryNotFoundAndNotInserted })
+  let query =
+    sql.add_category_if_not_exists(
+      db,
+      category.id,
+      category.user_id,
+      category.name,
+    )
+  let rows = {
+    use _ <- utils.get_id_entity(query, error.CategoryNotInserted)
+    Ok(category.id)
+  }
+  case rows {
+    [] -> Ok(Nil)
+    _ -> Error(error.CategoryNotInserted)
+  }
 }
 
 pub fn set_category(
-  id: String,
-  user_id: String,
-  name: String,
-  db: sqlight.Connection,
-) -> Result(Nil, AppError) {
-  let sql =
-    "
-insert into categories
-  (id, user_id, name)
-  values (?1, ?2, ?3);
-"
-
-  sqlight.query(
-    sql,
-    on: db,
-    with: [sqlight.text(id), sqlight.text(user_id), sqlight.text(name)],
-    expecting: category_row_decoder(),
-  )
-  |> result.map(fn(_) { Nil })
-  |> result.map_error(fn(_) { error.BadRequest })
+  db: database.Connection,
+  category: Category,
+) -> Result(String, AppError) {
+  let query = sql.set_category(db, category.id, category.user_id, category.name)
+  let rows = {
+    use _ <- utils.get_if_not_empty_entity(query, error.CategoryNotInserted)
+    Ok(category.id)
+  }
+  case rows {
+    [Ok(s)] -> Ok(s)
+    _ -> Error(error.CategoryNotInserted)
+  }
 }
 
 pub fn get_categories(
+  db: database.Connection,
   user_id: String,
-  db: sqlight.Connection,
 ) -> Result(List(Category), AppError) {
-  let sql =
-    "
-select
-  id,
-  user_id,
-  name
-from
-  categories
-where
-  user_id = ?1
-order by
-  id asc
-"
-  sqlight.query(
-    sql,
-    on: db,
-    with: [sqlight.text(user_id)],
-    expecting: category_row_decoder(),
-  )
-  |> result.map_error(fn(_) { error.CategoryNotFound })
+  let query = sql.get_categories(db, user_id)
+  let error = error.CategoryNotFound
+  use row <- utils.get_entity(query, error)
+  let sql.GetCategoriesRow(id, user_id, name) = row
+  Category(id, user_id, name)
 }

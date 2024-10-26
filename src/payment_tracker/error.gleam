@@ -1,3 +1,4 @@
+import gleam/option
 import sqlight
 
 pub type AppError {
@@ -11,7 +12,8 @@ pub type AppError {
   ContentRequired
   SqlightError(sqlight.Error)
   UserAlreadyExists
-  PaymentNotInserted
+  PaymentNotInserted(message: option.Option(String))
   CategoryNotFoundAndNotInserted
   DecodePaymentType
+  CategoryNotInserted
 }
