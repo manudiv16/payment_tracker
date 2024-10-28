@@ -1,4 +1,5 @@
 // import payment_tracker/router/category_router
+import payment_tracker/router/category_router
 import payment_tracker/router/payment_router
 import payment_tracker/router/user_router
 import payment_tracker/web.{type Context}
@@ -13,8 +14,9 @@ pub fn handle_request(req: Request, ctx: Context) -> Response {
   case wisp.path_segments(req) {
     ["user"] -> user_router.user(req, ctx)
     ["payment"] -> payment_router.payment(req, ctx)
-    ["payments", page, limit] -> payment_router.payments(req, ctx, page, limit)
-    // ["categories"] -> category_router.categories(req, ctx)
+    ["payments", page, limit, user_id] ->
+      payment_router.payments(req, ctx, page, limit, user_id)
+    ["categories", user_id] -> category_router.categories(req, ctx, user_id)
     _ -> wisp.not_found()
   }
 }

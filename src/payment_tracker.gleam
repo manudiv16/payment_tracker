@@ -5,6 +5,8 @@ import gleam/result
 import mist
 import payment_tracker/database
 
+import cors_builder as cors
+import gleam/http
 import payment_tracker/router
 import payment_tracker/web.{Context}
 import wisp
@@ -20,6 +22,7 @@ pub fn main() {
 
   let handle_request = fn(req) {
     use db <- database.with_pgo_connection()
+    use req <- cors.wisp_middleware(req, cors())
     let ctx = Context(user_id: 0, db: db, static_path: priv <> "/static")
     router.handle_request(req, ctx)
   }
@@ -31,6 +34,15 @@ pub fn main() {
     |> mist.start_http
 
   process.sleep_forever()
+}
+
+fn cors() {
+  cors.new()
+  |> cors.allow_origin("http://localhost:3000")
+  |> cors.allow_origin("http://localhost:1234")
+  |> cors.allow_method(http.Get)
+  |> cors.allow_method(http.Post)
+  |> cors.allow_header("Content-Type")
 }
 
 fn load_application_secret() -> String {

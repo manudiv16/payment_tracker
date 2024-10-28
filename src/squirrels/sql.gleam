@@ -18,7 +18,7 @@ VALUES ($1, $2, $3, $4, $5, $6, EXTRACT(EPOCH FROM NOW()));
     [
       pgo.text(arg_1),
       pgo.text(arg_2),
-      pgo.int(arg_3),
+      pgo.float(arg_3),
       pgo.text(arg_4),
       pgo.text(arg_5),
       pgo.text(arg_6),
@@ -68,9 +68,10 @@ pub type GetPaymentsByUserRow {
   GetPaymentsByUserRow(
     id: String,
     user_id: String,
-    amount: Int,
+    amount: Float,
     description: String,
     category: String,
+    category_name: String,
     payment_type: String,
     timestamp: Int,
   )
@@ -90,6 +91,7 @@ pub fn get_payments_by_user(db, arg_1) {
       use amount <- decode.parameter
       use description <- decode.parameter
       use category <- decode.parameter
+      use category_name <- decode.parameter
       use payment_type <- decode.parameter
       use timestamp <- decode.parameter
       GetPaymentsByUserRow(
@@ -98,28 +100,32 @@ pub fn get_payments_by_user(db, arg_1) {
         amount: amount,
         description: description,
         category: category,
+        category_name: category_name,
         payment_type: payment_type,
         timestamp: timestamp,
       )
     })
     |> decode.field(0, decode.string)
     |> decode.field(1, decode.string)
-    |> decode.field(2, decode.int)
+    |> decode.field(2, decode.float)
     |> decode.field(3, decode.string)
     |> decode.field(4, decode.string)
     |> decode.field(5, decode.string)
-    |> decode.field(6, decode.int)
+    |> decode.field(6, decode.string)
+    |> decode.field(7, decode.int)
 
   "SELECT
-  id,
-  user_id,
-  amount,
-  description,
-  category,
-  payment_type,
-  timestamp
+  payments.id,
+  payments.user_id,
+  payments.amount,
+  payments.description,
+  payments.category,
+  categories.name AS category_name,
+  payments.payment_type,
+  payments.timestamp
 FROM payments
-WHERE user_id = $1;
+JOIN categories ON payments.category = categories.id
+WHERE payments.user_id = $1
 "
   |> pgo.execute(db, [pgo.text(arg_1)], decode.from(decoder, _))
 }
@@ -153,9 +159,10 @@ pub type GetPaymentsPaginatedRow {
   GetPaymentsPaginatedRow(
     id: String,
     user_id: String,
-    amount: Int,
+    amount: Float,
     description: String,
     category: String,
+    category_name: String,
     payment_type: String,
     timestamp: Int,
   )
@@ -175,6 +182,7 @@ pub fn get_payments_paginated(db, arg_1, arg_2, arg_3) {
       use amount <- decode.parameter
       use description <- decode.parameter
       use category <- decode.parameter
+      use category_name <- decode.parameter
       use payment_type <- decode.parameter
       use timestamp <- decode.parameter
       GetPaymentsPaginatedRow(
@@ -183,28 +191,32 @@ pub fn get_payments_paginated(db, arg_1, arg_2, arg_3) {
         amount: amount,
         description: description,
         category: category,
+        category_name: category_name,
         payment_type: payment_type,
         timestamp: timestamp,
       )
     })
     |> decode.field(0, decode.string)
     |> decode.field(1, decode.string)
-    |> decode.field(2, decode.int)
+    |> decode.field(2, decode.float)
     |> decode.field(3, decode.string)
     |> decode.field(4, decode.string)
     |> decode.field(5, decode.string)
-    |> decode.field(6, decode.int)
+    |> decode.field(6, decode.string)
+    |> decode.field(7, decode.int)
 
   "SELECT
-  id,
-  user_id,
-  amount,
-  description,
-  category,
-  payment_type,
-  timestamp
+  payments.id,
+  payments.user_id,
+  payments.amount,
+  payments.description,
+  payments.category,
+  categories.name AS category_name,
+  payments.payment_type,
+  payments.timestamp
 FROM payments
-WHERE user_id = $1
+JOIN categories ON payments.category = categories.id
+WHERE payments.user_id = $1
 LIMIT $2
 OFFSET $3;
 "
@@ -358,7 +370,7 @@ pub type FilteredPaymentsRow {
   FilteredPaymentsRow(
     id: String,
     user_id: String,
-    amount: Int,
+    amount: Float,
     description: String,
     category: String,
     payment_type: String,
@@ -394,7 +406,7 @@ pub fn filtered_payments(db, arg_1, arg_2) {
     })
     |> decode.field(0, decode.string)
     |> decode.field(1, decode.string)
-    |> decode.field(2, decode.int)
+    |> decode.field(2, decode.float)
     |> decode.field(3, decode.string)
     |> decode.field(4, decode.string)
     |> decode.field(5, decode.string)
@@ -411,8 +423,7 @@ pub fn filtered_payments(db, arg_1, arg_2) {
 FROM payments
 WHERE user_id = $1 AND payment_type = $2;
 "
-  |> pgo.execute(db, [pgo.text(arg_1), pgo.text(arg_2)], decode.from(decoder, _),
-  )
+  |> pgo.execute(db, [pgo.text(arg_1), pgo.text(arg_2)], decode.from(decoder, _))
 }
 
 /// A row you get from running the `get_payments_by_id` query
@@ -425,7 +436,7 @@ pub type GetPaymentsByIdRow {
   GetPaymentsByIdRow(
     id: String,
     user_id: String,
-    amount: Int,
+    amount: Float,
     description: String,
     category: String,
     payment_type: String,
@@ -461,7 +472,7 @@ pub fn get_payments_by_id(db, arg_1, arg_2) {
     })
     |> decode.field(0, decode.string)
     |> decode.field(1, decode.string)
-    |> decode.field(2, decode.int)
+    |> decode.field(2, decode.float)
     |> decode.field(3, decode.string)
     |> decode.field(4, decode.string)
     |> decode.field(5, decode.string)
@@ -478,8 +489,7 @@ pub fn get_payments_by_id(db, arg_1, arg_2) {
 FROM payments
 WHERE user_id = $1 AND id = $2;
 "
-  |> pgo.execute(db, [pgo.text(arg_1), pgo.text(arg_2)], decode.from(decoder, _),
-  )
+  |> pgo.execute(db, [pgo.text(arg_1), pgo.text(arg_2)], decode.from(decoder, _))
 }
 
 /// A row you get from running the `get_payments_by_category` query
@@ -492,7 +502,7 @@ pub type GetPaymentsByCategoryRow {
   GetPaymentsByCategoryRow(
     id: String,
     user_id: String,
-    amount: Int,
+    amount: Float,
     description: String,
     category: String,
     payment_type: String,
@@ -528,7 +538,7 @@ pub fn get_payments_by_category(db, arg_1, arg_2) {
     })
     |> decode.field(0, decode.string)
     |> decode.field(1, decode.string)
-    |> decode.field(2, decode.int)
+    |> decode.field(2, decode.float)
     |> decode.field(3, decode.string)
     |> decode.field(4, decode.string)
     |> decode.field(5, decode.string)
@@ -545,6 +555,5 @@ pub fn get_payments_by_category(db, arg_1, arg_2) {
 FROM payments
 WHERE user_id = $1 AND category = $2;
 "
-  |> pgo.execute(db, [pgo.text(arg_1), pgo.text(arg_2)], decode.from(decoder, _),
-  )
+  |> pgo.execute(db, [pgo.text(arg_1), pgo.text(arg_2)], decode.from(decoder, _))
 }

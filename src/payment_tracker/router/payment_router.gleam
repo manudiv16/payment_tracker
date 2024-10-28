@@ -46,31 +46,31 @@ pub fn payments(
   ctx: Context,
   page: String,
   limit: String,
+  user_id: String,
 ) -> Response {
   case request.method {
-    http.Get -> get_payments(ctx, request, page, limit)
+    http.Get -> get_payments(ctx, page, limit, user_id)
     _ -> wisp.method_not_allowed([http.Get])
   }
 }
 
 fn get_payments(
   ctx: Context,
-  request: Request,
   page: String,
   limit: String,
+  user_id: String,
 ) -> Response {
-  use r_json <- wisp.require_json(request)
   let result = {
-    use id <- result.try(
-      dynamic.field("user_id", dynamic.string)(r_json)
-      |> result.replace_error(error.BadRequest),
-    )
     use page <- result.try(web.parse_int(page))
     use limit <- result.try(web.parse_int(limit))
-    let payment =
-      result.all(payment.get_payments_paginated(ctx.db, id, page, limit))
+    let payment = result.all(payment.get_payments_by_user(ctx.db, user_id))
     use pay <- result.try(payment)
-    Ok(json.to_string_builder(json.array(pay, payment.payments_to_json)))
+    Ok(
+      json.to_string_builder(json.array(
+        pay,
+        payment.to_json_get_payments_by_user,
+      )),
+    )
   }
   case result {
     Ok(body) -> wisp.json_response(body, 200)

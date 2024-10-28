@@ -7,24 +7,21 @@ import payment_tracker/error
 import payment_tracker/web.{type Context}
 import wisp.{type Request, type Response}
 
-pub fn categories(request: Request, ctx: Context) -> Response {
+pub fn categories(request: Request, ctx: Context, user_id: String) -> Response {
   case request.method {
-    http.Get -> get_categories(ctx, request)
+    http.Get -> get_categories(ctx, user_id)
     _ -> wisp.method_not_allowed([http.Get])
   }
 }
 
-fn get_categories(ctx: Context, request: Request) -> Response {
-  use r_json <- wisp.require_json(request)
+fn get_categories(ctx: Context, user_id: String) -> Response {
   let result = {
-    use id <- result.try(
-      dynamic.field("user_id", dynamic.string)(r_json)
-      |> result.replace_error(error.BadRequest),
-    )
-
-    use categories <- result.try(category.get_categories(ctx.db, id))
+    use categories <- result.try(category.get_categories(ctx.db, user_id))
     Ok(
-      json.to_string_builder(json.array(categories, category.category_to_json)),
+      json.to_string_builder(json.array(
+        categories,
+        category.get_category_to_json,
+      )),
     )
   }
 

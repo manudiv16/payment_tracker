@@ -19,6 +19,13 @@ pub fn category_row_decoder() -> dynamic.Decoder(Category) {
   )
 }
 
+pub fn get_category_to_json(category: Category) -> json.Json {
+  json.object([
+    #("category_id", json.string(category.id)),
+    #("category_name", json.string(category.name)),
+  ])
+}
+
 pub fn category_to_json(category: Category) -> json.Json {
   json.object([
     #("category_id", json.string(category.id)),
