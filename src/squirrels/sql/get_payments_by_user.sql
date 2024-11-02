@@ -1,10 +1,12 @@
 SELECT
-  id,
-  user_id,
-  amount,
-  description,
-  category,
-  payment_type,
-  timestamp
+  payments.id,
+  payments.user_id,
+  payments.amount,
+  payments.description,
+  payments.category,
+  categories.name AS category_name,
+  payments.payment_type,
+  payments.timestamp
 FROM payments
-WHERE user_id = $1;
+JOIN categories ON payments.category = categories.id
+WHERE payments.user_id = $1
